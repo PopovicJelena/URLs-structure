@@ -1,5 +1,5 @@
 import express, { Express, Request, Response } from "express"
-import { getFromCache } from "./procesUrl"
+import { getUrlStructureFromCache } from "./procesUrl"
 
 const app: Express = express()
 const port = '5000'
@@ -8,11 +8,11 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 app.get("/api/files", async function (req: Request, res: Response) {
-    const result = await getFromCache()
+    const result = await getUrlStructureFromCache()
     res.json(result)
 })
 
 app.listen(port, () => {
-    getFromCache()
+    getUrlStructureFromCache()
     console.log(`Server is running at PORT ${port}.`)
 })

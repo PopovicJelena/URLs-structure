@@ -1,17 +1,41 @@
 import axios from "axios"
 
-export type RecursiveMap = Map<string, RecursiveMap>
-export type FinalResultRecursive = Array<Record<string, FinalResultRecursive> | string>
+type RecursiveMap = Map<string, RecursiveMap>
+type UrlStructureRecursive = Array<Record<string, UrlStructureRecursive> | string>
 
-export const parseUrl = (url: string) => {
-    const urlObject = new URL(url)
-    const ip = urlObject.hostname
-    const pathParts = urlObject.pathname.split('/').filter(part => part)
+// If data changes, there should be mechanism to update cache
+let cacheData: undefined | Promise<{ fileUrl: string }[]> | { fileUrl: string }[]
 
-    return [ip, ...pathParts]
+export const getUrlStructureFromCache = async (): Promise<UrlStructureRecursive> => {
+    if (cacheData == null) {
+        cacheData = getUrls()
+    }
+    const urls = await cacheData
+
+    const parsedUrls = urls.map(url => parseUrl(url.fileUrl))
+    const urlsMap = processUrlParsedParts(parsedUrls)
+
+    const result: UrlStructureRecursive = []
+    processLayer(urlsMap, result)
+
+    return result
 }
 
-export const processParts = (items: string[][]) => {
+const getUrls = async (): Promise<{ fileUrl: string }[]> => {
+    const URL = 'https://rest-test-eight.vercel.app/api/test'
+    const response = await axios.get(URL)
+    return response.data.items
+}
+
+const parseUrl = (url: string) => {
+    const urlObject = new URL(url)
+    return [
+        urlObject.hostname,
+        ...urlObject.pathname.split('/').filter(part => part),
+    ]
+}
+
+const processUrlParsedParts = (items: string[][]) => {
     const resultMap: RecursiveMap = new Map()
 
     const processPartsHelper = (parts: string[]) => {
@@ -30,9 +54,9 @@ export const processParts = (items: string[][]) => {
     return resultMap
 }
 
-export const processMapLayer = (
+const processLayer = (
     map: RecursiveMap,
-    parentLayer: FinalResultRecursive,
+    parentLayer: UrlStructureRecursive,
 ) => {
     map.forEach((v, k) => {
         if (v.size > 0) {
@@ -40,33 +64,11 @@ export const processMapLayer = (
                 parentLayer.push({ [k]: [] })
             }
 
-            const childLayer = (parentLayer.find(it => typeof it === 'object' && it[k] != null)! as Record<string, FinalResultRecursive>)[k]
+            const childLayer = (parentLayer.find(it => typeof it === 'object' && it[k] != null)! as Record<string, UrlStructureRecursive>)[k]
 
-            processMapLayer(v, childLayer)
+            processLayer(v, childLayer)
         } else if (v.size === 0 && parentLayer.find(it => it === k) == null) {
             parentLayer.push(k)
         }
     })
-}
-
-let cacheData: undefined | Promise<{ fileUrl: string }[]> | { fileUrl: string }[]
-
-export const getFromCache = async (): Promise<FinalResultRecursive> => {
-    if (cacheData == null) {
-        cacheData = initializeCache()
-    }
-
-    const urls = await cacheData
-    const parsedItems = urls.map(url => parseUrl(url.fileUrl))
-    const recursiveMap = processParts(parsedItems)
-    const result: FinalResultRecursive = []
-    processMapLayer(recursiveMap, result)
-    return result
-
-}
-
-const initializeCache = async (): Promise<{ fileUrl: string }[]> => {
-    const URL = 'https://rest-test-eight.vercel.app/api/test'
-    const response = await axios.get(URL)
-    return response.data.items
 }
